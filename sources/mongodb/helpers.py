@@ -98,7 +98,7 @@ class CollectionLoader:
         self,
         client: TMongoClient,
         collection: TCollection,
-        chunk_size: int,
+        chunk_size: Optional[int] = None,
         incremental: Optional[dlt.sources.incremental[Any]] = None,
     ) -> None:
         self.client = client
@@ -282,9 +282,11 @@ class CollectionLoaderParallel(CollectionLoader):
         batches = []
         left_to_load = doc_count
 
-        for sk in range(0, doc_count, self.chunk_size):
-            batches.append(dict(skip=sk, limit=min(self.chunk_size, left_to_load)))
-            left_to_load -= self.chunk_size
+        chunk_size = self.chunk_size or 10000
+
+        for sk in range(0, doc_count, chunk_size):
+            batches.append(dict(skip=sk, limit=min(chunk_size, left_to_load)))
+            left_to_load -= chunk_size
 
         return batches
 
