@@ -50,29 +50,45 @@ if PYMONGOARROW_AVAILABLE:
     import pymongoarrow
 
 
+def _normalize_tz_name(tz_name: str) -> str:
+    if tz_name in ("+00:00", "Z", "Etc/UTC", "UTC", None):
+        return "UTC"
+    return tz_name
+
+
 def max_dt_with_lag_last_value_func(event, lag_days: int | None = 1) -> p_datetime:
+    """
+    Calculates the last value for incremental loading with a time lag.
+
+    This function determines the last value for incremental data loading, applying a configurable
+    time lag to prevent missing recent data updates. It handles single or paired datetime events,
+    subtracting a specified number of days from the most recent datetime.
+
+    Args:
+        event (Union[p_datetime, Tuple[p_datetime, p_datetime]]): The datetime event(s) to process.
+        lag_days (Optional[int], optional): Number of days to subtract as a lag. Defaults to 1.
+
+    Returns:
+        p_datetime: The calculated last value with applied time lag, ensuring it does not exceed
+        the day before the current time in the event's timezone.
+    """
     _lag_days: int = lag_days or 1
     last_value = pendulum.instance(datetime.fromtimestamp(0, tz=pendulum.UTC))
     item: p_datetime
-    # print("Items received in this event: "+str(len(event)))
 
     if len(event) == 1:
         (item,) = event
     else:
         item, last_value = event
 
-    # print(
-    #     "item: "
-    #     + str(item)
-    #     + " last value: "
-    #     + str("None" if last_value is None else last_value)
-    # )
-    # setting the last value
     last_value = max(item.subtract(days=_lag_days), last_value)
     last_value_tz = last_value.timezone_name
-    last_value = min(pendulum.now(tz=last_value_tz).subtract(days=1), last_value)
-    last_value = last_value
-    # print("Final chosen last value: "+str(last_value)+"\n")
+    if last_value_tz is not None:
+        last_value_tz = _normalize_tz_name(last_value_tz)
+        last_value_tz = pendulum.timezone(str(last_value_tz))
+        last_value = min(pendulum.now(tz=last_value_tz).subtract(days=1), last_value)
+    else:
+        last_value = min(pendulum.now("UTC").subtract(days=1), last_value)
 
     return last_value
 
@@ -516,7 +532,7 @@ def collection_documents(
     collection: TCollection,
     filter_: Dict[str, Any],
     projection: Union[Dict[str, Any], List[str]],
-    pymongoarrow_schema: "pymongoarrow.schema.Schema",
+    pymongoarrow_schema: "pymongoarrow.schema.Schema", # type: ignore
     incremental: Optional[dlt.sources.incremental[Any]] = None,
     parallel: bool = False,
     limit: Optional[int] = None,
