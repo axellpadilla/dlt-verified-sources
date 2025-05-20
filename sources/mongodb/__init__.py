@@ -1,11 +1,12 @@
 """Source that loads collections form any a mongo database, supports incremental loads."""
 
-from typing import Any, Dict, Iterable, List, Optional, Union, Mapping
+from typing import Any, Dict, Iterable, List, Literal, Optional, Union, Mapping
 
 import dlt
 from dlt.common.data_writers import TDataItemFormat
+from dlt.common.schema.typing import TWriteDisposition
 from dlt.sources import DltResource
-from dlt.common.configuration.specs.config_section_context import ConfigSectionContext
+from dlt.common.configuration.specs.config_section_context import ConfigSectionContext  # noqa: F401
 
 from .helpers import (
     MongoDbCollectionConfiguration,
@@ -15,18 +16,19 @@ from .helpers import (
 )
 
 
-@dlt.source
+@dlt.source(root_key=True)
 def mongodb(
-    connection_url: str = dlt.secrets.value,
+    connection_url: dlt.TSecretValue = dlt.secrets.value,
     database: Optional[str] = dlt.config.value,
     collection_names: Optional[List[str]] = dlt.config.value,
     incremental: Optional[dlt.sources.incremental] = None,  # type: ignore[type-arg]
-    write_disposition: Optional[str] = dlt.config.value,
+    write_disposition: Literal[TWriteDisposition] = dlt.config.value,
     parallel: Optional[bool] = dlt.config.value,
     limit: Optional[int] = None,
     filter_: Optional[Dict[str, Any]] = None,
     projection: Optional[Union[Mapping[str, Any], Iterable[str]]] = None,
     pymongoarrow_schema: Optional[Any] = None,
+    data_item_format: Optional[TDataItemFormat] = "object",
 ) -> Iterable[DltResource]:
     """
     A DLT source which loads data from a mongo database using PyMongo.
@@ -38,7 +40,7 @@ def mongodb(
         collection_names (Optional[List[str]]): The list of collections `pymongo.collection.Collection` to load.
         incremental (Optional[dlt.sources.incremental]): Option to enable incremental loading for the collection.
             E.g., `incremental=dlt.sources.incremental('updated_at', pendulum.parse('2022-01-01T00:00:00Z'))`
-        write_disposition (str): Write disposition of the resource.
+        write_disposition (TWriteDisposition): Write disposition of the resource, Literal["replace", "append", "merge", "skip"].
         parallel (Optional[bool]): Option to enable parallel loading for the collection. Default is False.
         limit (Optional[int]):
             The maximum number of documents to load. The limit is
@@ -57,7 +59,7 @@ def mongodb(
     """
 
     # set up mongo client
-    client = client_from_credentials(connection_url)
+    client = client_from_credentials(connection_url)  # type: ignore
     if not database:
         mongo_database = client.get_default_database()
     else:
@@ -82,6 +84,7 @@ def mongodb(
             incremental=incremental,
             parallel=parallel,
             limit=limit,
+            data_item_format=data_item_format,
             filter_=filter_ or {},
             projection=projection,
             pymongoarrow_schema=pymongoarrow_schema,
@@ -98,7 +101,7 @@ def mongodb_collection(
     database: Optional[str] = dlt.config.value,
     collection: str = dlt.config.value,
     incremental: Optional[dlt.sources.incremental] = None,  # type: ignore[type-arg]
-    write_disposition: Optional[str] = dlt.config.value,
+    write_disposition: Literal[TWriteDisposition] = dlt.config.value,
     parallel: Optional[bool] = False,
     limit: Optional[int] = None,
     chunk_size: Optional[int] = 10000,
@@ -116,7 +119,7 @@ def mongodb_collection(
         collection (str): The collection name to load.
         incremental (Optional[dlt.sources.incremental]): Option to enable incremental loading for the collection.
             E.g., `incremental=dlt.sources.incremental('updated_at', pendulum.parse('2022-01-01T00:00:00Z'))`
-        write_disposition (str): Write disposition of the resource.
+        write_disposition (TWriteDisposition): Write disposition of the resource, Literal["replace", "append", "merge", "skip"].
         parallel (Optional[bool]): Option to enable parallel loading for the collection. Default is False.
         limit (Optional[int]): The number of documents load.
         chunk_size (Optional[int]): The number of documents load in each batch.
