@@ -6,7 +6,9 @@ import dlt
 from dlt.common.data_writers import TDataItemFormat
 from dlt.common.schema.typing import TWriteDisposition
 from dlt.sources import DltResource
-from dlt.common.configuration.specs.config_section_context import ConfigSectionContext  # noqa: F401
+from dlt.common.configuration.specs.config_section_context import (
+    ConfigSectionContext,  # noqa: F401
+)
 
 from .helpers import (
     MongoDbCollectionConfiguration,
